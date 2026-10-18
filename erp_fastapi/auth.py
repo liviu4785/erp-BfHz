@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt as pyjwt
 from jwt.exceptions import PyJWTError
@@ -15,13 +15,21 @@ security = HTTPBearer(auto_error=False)
 
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}${hashed}"
+    hashed = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+    return f"scrypt${salt}${hashed}"
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    salt, expected = hashed.split("$", 1)
-    return hashlib.sha256((salt + plain).encode()).hexdigest() == expected
+    try:
+        if hashed.startswith("scrypt$"):
+            _, salt, expected = hashed.split("$")
+            actual = hashlib.scrypt(plain.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
+        else:
+            salt, expected = hashed.split("$", 1)
+            actual = hashlib.sha256((salt + plain).encode()).hexdigest()
+        return secrets.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
@@ -30,6 +38,7 @@ def create_access_token(user_id: int, expires_delta: Optional[timedelta] = None)
 
 
 def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
@@ -41,8 +50,11 @@ def get_current_user(
     except (PyJWTError, ValueError, TypeError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path != "/auth/me":
+        if not user.role or user.role.name not in ("admin", "operator"):
+            raise HTTPException(403, "Write access requires admin or operator role")
     return user
 
 
@@ -58,3 +70,9 @@ def get_optional_user(
     except (PyJWTError, ValueError, TypeError):
         return None
     return db.query(User).filter(User.id == user_id).first()
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.role or user.role.name != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return user

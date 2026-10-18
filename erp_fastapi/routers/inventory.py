@@ -30,6 +30,8 @@ def create_inventory(payload: InventoryCreate, db: Session = Depends(get_db), _:
         raise HTTPException(status_code=400, detail="Product does not exist")
     if db.query(InventoryItem).filter(InventoryItem.product_id == payload.product_id).first():
         raise HTTPException(status_code=400, detail="Inventory for this product already exists")
+    if payload.reserved != 0:
+        raise HTTPException(400, "Reservations are managed by orders")
     item = InventoryItem(**payload.model_dump())
     db.add(item)
     db.commit()
@@ -50,8 +52,14 @@ def update_inventory(item_id: int, payload: InventoryUpdate, db: Session = Depen
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
+    if payload.reserved is not None and payload.reserved != item.reserved:
+        raise HTTPException(400, "Reservations are managed by orders")
+    if payload.quantity is None:
+        raise HTTPException(400, "Quantity is required")
+    from sqlalchemy import update
+    result = db.execute(update(InventoryItem).where(InventoryItem.id == item_id, InventoryItem.reserved <= payload.quantity).values(quantity=payload.quantity))
+    if result.rowcount != 1:
+        raise HTTPException(409, "Quantity cannot be below reserved stock")
     db.commit()
     db.refresh(item)
     return _inv_out(item)
@@ -62,5 +70,7 @@ def delete_inventory(item_id: int, db: Session = Depends(get_db), _: User = Depe
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
+    if item.reserved:
+        raise HTTPException(409, "Cannot delete reserved inventory")
     db.delete(item)
     db.commit()

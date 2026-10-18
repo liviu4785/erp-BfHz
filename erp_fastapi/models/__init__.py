@@ -15,3 +15,6 @@ __all__ = [
     "InventoryItem", "Order", "OrderLine", "Comment",
     "Document", "Address", "person_company",
 ]
+
+from .stock_movement import StockMovement
+from .integration import ExternalOrder, ProductMapping, IntegrationOperation

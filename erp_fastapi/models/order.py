@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from erp_fastapi.database import Base
 
@@ -13,6 +13,9 @@ class Order(Base):
     date = Column(String(20), nullable=False)
     status = Column(String(50), default="draft")
     notes = Column(String(500), nullable=True)
+    version = Column(Integer, nullable=False, default=1)
+    workflow_managed = Column(Boolean, nullable=False, default=True)
+    __mapper_args__ = {"version_id_col": version}
 
     items = relationship("OrderLine", back_populates="order", cascade="all, delete-orphan")
 
