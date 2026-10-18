@@ -9,7 +9,9 @@ from erp_fastapi.database import engine, Base
 from erp_fastapi.routers import auth, users, roles, companies, people, products, inventory, orders, comments, documents, addresses
 
 # Create all tables
-Base.metadata.create_all(bind=engine)
+import os
+if os.getenv("AUTO_CREATE_TABLES", "false").lower() == "true":
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ERP WLB", version="2.0.0")
 
@@ -22,6 +24,8 @@ app.add_middleware(
 )
 
 # API routers
+from erp_fastapi.routers import integrations
+app.include_router(integrations.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(roles.router)
@@ -50,4 +54,21 @@ def root():
 
 @app.get("/health")
 def health():
+    from sqlalchemy import text
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
     return {"status": "healthy"}
+
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import StaleDataError
+
+@app.exception_handler(IntegrityError)
+async def integrity_error(request: Request, exc: IntegrityError):
+    return JSONResponse(status_code=409, content={"detail": "Conflicting data or invalid reference"})
+
+@app.exception_handler(StaleDataError)
+async def concurrent_error(request: Request, exc: StaleDataError):
+    return JSONResponse(status_code=409, content={"detail": "Record changed concurrently; reload and retry"})

@@ -18,5 +18,15 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
+
+
+from sqlalchemy import event
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def sqlite_foreign_keys(connection, record):
+        connection.execute("PRAGMA foreign_keys=ON")

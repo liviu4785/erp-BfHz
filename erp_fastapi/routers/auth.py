@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from erp_fastapi.database import get_db
@@ -10,6 +11,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
+    if os.getenv("ALLOW_REGISTRATION", "false").lower() != "true":
+        raise HTTPException(status_code=403, detail="Registration is disabled; contact an administrator")
+    if payload.role_id is not None:
+        raise HTTPException(status_code=403, detail="Self-registration cannot assign roles")
     if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(
@@ -35,8 +40,11 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user or not user.is_active or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.hashed_password.startswith("scrypt$"):
+        user.hashed_password = hash_password(payload.password)
+        db.commit()
     token = create_access_token(user.id)
     return Token(
         access_token=token,
@@ -55,3 +63,17 @@ def me(current_user: User = Depends(get_current_user)):
         is_active=current_user.is_active, role_id=current_user.role_id,
         role_name=current_user.role.name if current_user.role else None,
     )
+
+
+from pydantic import BaseModel, Field
+class ProfileUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=3, max_length=200)
+
+@router.put("/me", response_model=UserOut)
+def update_me(payload: ProfileUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if db.query(User).filter(User.email == payload.email, User.id != user.id).first():
+        raise HTTPException(409, "Email already registered")
+    user.name, user.email = payload.name, payload.email
+    db.commit()
+    return me(user)

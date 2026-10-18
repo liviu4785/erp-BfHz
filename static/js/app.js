@@ -1,3 +1,6 @@
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+}
 const API = '';
 let token = localStorage.getItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
@@ -32,7 +35,7 @@ function showLogin() {
             <div id="login-alert"></div>
             <div class="login-tabs">
                 <button class="active" onclick="switchTab('login')">Autentificare</button>
-                <button onclick="switchTab('register')">Inregistrare</button>
+                <span>Conturile sunt create de administrator.</span>
             </div>
             <form id="login-form" onsubmit="handleLogin(event)">
                 <div class="form-group"><label>Email</label><input type="email" id="login-email" required placeholder="email@exemplu.ro"></div>
@@ -71,7 +74,7 @@ async function handleLogin(e) {
         });
         setAuth(data);
     } catch (err) {
-        document.getElementById('login-alert').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+        document.getElementById('login-alert').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -85,7 +88,7 @@ async function handleRegister(e) {
         });
         setAuth(data);
     } catch (err) {
-        document.getElementById('login-alert').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+        document.getElementById('login-alert').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
     }
 }
 
@@ -127,7 +130,7 @@ function showApp() {
                 <a onclick="navigate('profile')" data-page="profile"><span class="nav-icon">&#128113;</span> Profilul meu</a>
             </div>
             <div class="sidebar-footer">
-                <div class="user-info"><strong>${currentUser.name}</strong>${currentUser.email}</div>
+                <div class="user-info"><strong>${escapeHtml(currentUser.name)}</strong>${escapeHtml(currentUser.email)}</div>
                 <button class="btn btn-secondary btn-sm btn-full" onclick="logout()">Deconectare</button>
             </div>
         </nav>
@@ -146,6 +149,7 @@ function showApp() {
             <div class="modal-footer" id="modal-footer"></div>
         </div>
     </div>`;
+    document.querySelectorAll('[data-page=admin], [data-page=users], [data-page=roles]').forEach(el => el.hidden = currentUser.role_name !== 'admin');
     navigate('dashboard');
 }
 
@@ -176,7 +180,7 @@ window.load_dashboard = async function() {
     try {
         const [companies, products, orders, people, inventory, users] = await Promise.all([
             api('GET','/companies/'), api('GET','/products/'), api('GET','/orders/'),
-            api('GET','/people/'), api('GET','/inventory/'), api('GET','/users/'),
+            api('GET','/people/'), api('GET','/inventory/'), currentUser.role_name === 'admin' ? api('GET','/users/') : Promise.resolve([]),
         ]);
         const sales = orders.filter(o => o.order_type === 'sale');
         const purchases = orders.filter(o => o.order_type === 'purchase');
@@ -206,7 +210,7 @@ window.load_dashboard = async function() {
             </tbody></table>
         </div>`;
     } catch(err) {
-        document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+        document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
     }
 };
 
@@ -256,12 +260,12 @@ window.load_admin = async function() {
                 <dt>Versiune</dt><dd>ERP WLB v2.0</dd>
                 <dt>Baza de date</dt><dd>SQLite (portabil)</dd>
                 <dt>API Docs</dt><dd><a href="/docs" target="_blank">Deschide documentatia API &rarr;</a></dd>
-                <dt>Utilizator curent</dt><dd>${currentUser.name} (${currentUser.email})</dd>
+                <dt>Utilizator curent</dt><dd>${escapeHtml(currentUser.name)} (${escapeHtml(currentUser.email)})</dd>
                 <dt>Rol</dt><dd>${currentUser.role_name || 'Fara rol atribuit'}</dd>
             </div>
         </div>`;
     } catch(err) {
-        document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+        document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
     }
 };
 
@@ -273,8 +277,8 @@ window.load_profile = async function() {
         <div class="profile-card">
             <h3>Informatii cont</h3>
             <div class="profile-info">
-                <dt>Nume</dt><dd>${me.name}</dd>
-                <dt>Email</dt><dd>${me.email}</dd>
+                <dt>Nume</dt><dd>${escapeHtml(me.name)}</dd>
+                <dt>Email</dt><dd>${escapeHtml(me.email)}</dd>
                 <dt>Rol</dt><dd>${me.role_name || 'Neatribuit'}</dd>
                 <dt>Cont activ</dt><dd><span class="badge ${me.is_active?'badge-green':'badge-red'}">${me.is_active?'Da':'Nu'}</span></dd>
                 <dt>ID utilizator</dt><dd>#${me.id}</dd>
@@ -283,19 +287,19 @@ window.load_profile = async function() {
         <div class="settings-section">
             <h3>Modifica datele contului</h3>
             <div class="form-grid">
-                <div class="form-group"><label>Nume</label><input id="prof-name" value="${me.name}"></div>
-                <div class="form-group"><label>Email</label><input id="prof-email" value="${me.email}"></div>
+                <div class="form-group"><label>Nume</label><input id="prof-name" value="${escapeHtml(me.name)}"></div>
+                <div class="form-group"><label>Email</label><input id="prof-email" value="${escapeHtml(me.email)}"></div>
             </div>
             <button class="btn btn-primary" style="margin-top:12px" onclick="updateProfile()">Salveaza modificarile</button>
         </div>`;
     } catch(err) {
-        document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+        document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
     }
 };
 
 window.updateProfile = async function() {
     try {
-        await api('PUT', `/users/${currentUser.id}`, {
+        await api('PUT', '/auth/me', {
             name: document.getElementById('prof-name').value,
             email: document.getElementById('prof-email').value,
         });
@@ -319,7 +323,7 @@ function crudPage(config) {
             window._crud_config = config;
             renderCrudTable(items);
         } catch(err) {
-            document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+            document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
         }
     };
 }
@@ -333,7 +337,7 @@ function renderCrudTable(items) {
     document.getElementById('page-content').innerHTML = `<div class="table-card"><table>
         <thead><tr>${c.columns.map(col => `<th>${col.label}</th>`).join('')}<th>Actiuni</th></tr></thead>
         <tbody>${items.map(item => `<tr>
-            ${c.columns.map(col => `<td>${col.render ? col.render(item) : (item[col.key] ?? '-')}</td>`).join('')}
+            ${c.columns.map(col => `<td>${col.render ? col.render(item) : escapeHtml(item[col.key] ?? '-')}</td>`).join('')}
             <td class="actions-cell">
                 <button class="btn btn-sm btn-secondary" onclick='window._crud_edit(${JSON.stringify(item).replace(/'/g,"&#39;")})'>Editeaza</button>
                 <button class="btn btn-sm btn-danger" onclick="window._crud_delete(${item.id})">Sterge</button>
@@ -387,14 +391,14 @@ window.load_companies = crudPage({
     columns: [
         {key:'id',label:'ID'}, {key:'name',label:'Nume'}, {key:'fiscal_code',label:'CUI'},
         {key:'phone',label:'Telefon'}, {key:'email',label:'Email'},
-        {key:'status',label:'Status',render:i=>`<span class="badge badge-${i.status==='active'?'green':'gray'}">${i.status||'active'}</span>`},
+        {key:'status',label:'Status',render:i=>`<span class="badge badge-${i.status==='active'?'green':'gray'}">${escapeHtml(i.status||'active')}</span>`},
     ],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>Nume *</label><input id="f-name" value="${i.name||''}"></div>
-        <div class="form-group"><label>CUI</label><input id="f-fiscal_code" value="${i.fiscal_code||''}"></div>
-        <div class="form-group"><label>Nr. Reg. Com.</label><input id="f-reg" value="${i.trade_registry_number||''}"></div>
-        <div class="form-group"><label>Email</label><input id="f-email" value="${i.email||''}"></div>
-        <div class="form-group"><label>Telefon</label><input id="f-phone" value="${i.phone||''}"></div>
+        <div class="form-group"><label>Nume *</label><input id="f-name" value="${escapeHtml(i.name||'')}"></div>
+        <div class="form-group"><label>CUI</label><input id="f-fiscal_code" value="${escapeHtml(i.fiscal_code||'')}"></div>
+        <div class="form-group"><label>Nr. Reg. Com.</label><input id="f-reg" value="${escapeHtml(i.trade_registry_number||'')}"></div>
+        <div class="form-group"><label>Email</label><input id="f-email" value="${escapeHtml(i.email||'')}"></div>
+        <div class="form-group"><label>Telefon</label><input id="f-phone" value="${escapeHtml(i.phone||'')}"></div>
         <div class="form-group"><label>Status</label><select id="f-status"><option value="active" ${i.status==='active'?'selected':''}>Activ</option><option value="inactive" ${i.status==='inactive'?'selected':''}>Inactiv</option></select></div>
     </div>`,
     getFormData: () => ({
@@ -413,13 +417,13 @@ window.load_people = crudPage({
         {key:'email',label:'Email'}, {key:'phone',label:'Telefon'},
     ],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>Prenume *</label><input id="f-first_name" value="${i.first_name||''}"></div>
-        <div class="form-group"><label>Nume *</label><input id="f-last_name" value="${i.last_name||''}"></div>
-        <div class="form-group"><label>Email</label><input id="f-email" value="${i.email||''}"></div>
-        <div class="form-group"><label>Telefon</label><input id="f-phone" value="${i.phone||''}"></div>
-        <div class="form-group"><label>Data nasterii</label><input type="date" id="f-dob" value="${i.date_of_birth||''}"></div>
-        <div class="form-group"><label>CNP</label><input id="f-cnp" value="${i.unique_identifier||''}"></div>
-        <div class="form-group full"><label>Note</label><textarea id="f-notes" rows="2">${i.notes||''}</textarea></div>
+        <div class="form-group"><label>Prenume *</label><input id="f-first_name" value="${escapeHtml(i.first_name||'')}"></div>
+        <div class="form-group"><label>Nume *</label><input id="f-last_name" value="${escapeHtml(i.last_name||'')}"></div>
+        <div class="form-group"><label>Email</label><input id="f-email" value="${escapeHtml(i.email||'')}"></div>
+        <div class="form-group"><label>Telefon</label><input id="f-phone" value="${escapeHtml(i.phone||'')}"></div>
+        <div class="form-group"><label>Data nasterii</label><input type="date" id="f-dob" value="${escapeHtml(i.date_of_birth||'')}"></div>
+        <div class="form-group"><label>CNP</label><input id="f-cnp" value="${escapeHtml(i.unique_identifier||'')}"></div>
+        <div class="form-group full"><label>Note</label><textarea id="f-notes" rows="2">${escapeHtml(i.notes||'')}</textarea></div>
     </div>`,
     getFormData: () => ({
         first_name:document.getElementById('f-first_name').value, last_name:document.getElementById('f-last_name').value,
@@ -437,25 +441,25 @@ window.load_products = crudPage({
         {key:'id',label:'ID'}, {key:'code',label:'Cod'}, {key:'name',label:'Nume'},
         {key:'category',label:'Categorie'},
         {key:'list_price',label:'Pret',render:i=>i.list_price!=null?`${Number(i.list_price).toFixed(2)} RON`:'-'},
-        {key:'status',label:'Status',render:i=>`<span class="badge badge-${i.status==='active'?'green':'gray'}">${i.status||'active'}</span>`},
+        {key:'status',label:'Status',render:i=>`<span class="badge badge-${i.status==='active'?'green':'gray'}">${escapeHtml(i.status||'active')}</span>`},
     ],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group full"><label>Nume *</label><input id="f-name" value="${i.name||''}"></div>
-        <div class="form-group"><label>Cod</label><input id="f-code" value="${i.code||''}"></div>
-        <div class="form-group"><label>Producator</label><input id="f-producer" value="${i.producer||''}"></div>
-        <div class="form-group"><label>Categorie</label><input id="f-category" value="${i.category||''}"></div>
-        <div class="form-group"><label>UM</label><input id="f-unit" value="${i.unit_of_measure||'buc'}"></div>
+        <div class="form-group full"><label>Nume *</label><input id="f-name" value="${escapeHtml(i.name||'')}"></div>
+        <div class="form-group"><label>Cod</label><input id="f-code" value="${escapeHtml(i.code||'')}"></div>
+        <div class="form-group"><label>Producator</label><input id="f-producer" value="${escapeHtml(i.producer||'')}"></div>
+        <div class="form-group"><label>Categorie</label><input id="f-category" value="${escapeHtml(i.category||'')}"></div>
+        <div class="form-group"><label>UM</label><input id="f-unit" value="${escapeHtml(i.unit_of_measure||'buc')}"></div>
         <div class="form-group"><label>Pret lista</label><input type="number" step="0.01" id="f-price" value="${i.list_price||0}"></div>
-        <div class="form-group"><label>TVA %</label><input type="number" id="f-vat" value="${i.vat_percent||19}"></div>
+        <div class="form-group"><label>TVA %</label><input type="number" id="f-vat" value="${i.vat_percent??19}"></div>
         <div class="form-group"><label>Status</label><select id="f-status"><option value="active" ${i.status==='active'?'selected':''}>Activ</option><option value="inactive" ${i.status==='inactive'?'selected':''}>Inactiv</option></select></div>
-        <div class="form-group full"><label>Descriere</label><textarea id="f-desc" rows="2">${i.description||''}</textarea></div>
+        <div class="form-group full"><label>Descriere</label><textarea id="f-desc" rows="2">${escapeHtml(i.description||'')}</textarea></div>
     </div>`,
     getFormData: () => ({
         name:document.getElementById('f-name').value, code:document.getElementById('f-code').value||null,
         producer:document.getElementById('f-producer').value||null, category:document.getElementById('f-category').value||null,
         unit_of_measure:document.getElementById('f-unit').value||'buc',
         list_price:parseFloat(document.getElementById('f-price').value)||0,
-        vat_percent:parseFloat(document.getElementById('f-vat').value)||19,
+        vat_percent:parseFloat(document.getElementById('f-vat').value)??19,
         status:document.getElementById('f-status').value, description:document.getElementById('f-desc').value||null,
     }),
 });
@@ -469,7 +473,7 @@ window.load_inventory = crudPage({
         {key:'reserved',label:'Rezervat'}, {key:'available',label:'Disponibil',render:i=>i.quantity-i.reserved},
     ],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>ID Produs *</label><input type="number" id="f-product_id" value="${i.product_id||''}"></div>
+        <div class="form-group"><label>ID Produs *</label><input type="number" id="f-product_id" value="${escapeHtml(i.product_id||'')}"></div>
         <div class="form-group"><label>Cantitate *</label><input type="number" id="f-quantity" value="${i.quantity||0}"></div>
         <div class="form-group"><label>Rezervat</label><input type="number" id="f-reserved" value="${i.reserved||0}"></div>
     </div>`,
@@ -504,7 +508,7 @@ window.load_orders = async function() {
                     <button class="btn btn-sm btn-danger" onclick="window._order_delete(${o.id})">Sterge</button>
                 </td></tr>`).join('')}
             </tbody></table></div>`;
-    } catch(err) { document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${err.message}</div>`; }
+    } catch(err) { document.getElementById('page-content').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`; }
 };
 
 window._order_add = function() {
@@ -526,6 +530,7 @@ window._order_add = function() {
         <button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="window._order_add_line()">+ Adauga linie</button>
     `, `<button class="btn btn-secondary" onclick="closeModal()">Anuleaza</button>
         <button class="btn btn-primary" onclick="window._order_save()">Salveaza</button>`);
+    window._editingOrderStatus = 'draft';
     window._orderLineCount = 0;
     window._order_add_line();
 };
@@ -538,7 +543,8 @@ window._order_add_line = function() {
         <div class="form-group"><label>Produs ID</label><input type="number" id="ol-product-${idx}"></div>
         <div class="form-group"><label>Cantitate</label><input type="number" id="ol-qty-${idx}" value="1"></div>
         <div class="form-group"><label>Pret unitar</label><input type="number" step="0.01" id="ol-price-${idx}" value="0"></div>
-        <div class="form-group"><label>TVA %</label><input type="number" id="ol-vat-${idx}" value="19"></div>`;
+        <div class="form-group"><label>TVA %</label><input type="number" id="ol-vat-${idx}" value="19"></div>
+        <div class="form-group"><label>Discount %</label><input type="number" id="ol-discount-${idx}" value="0" min="0" max="100"></div>`;
     document.getElementById('order-lines').appendChild(div);
 };
 
@@ -549,19 +555,22 @@ window._order_save = async function(id) {
         if (!pid || !pid.value) continue;
         items.push({ product_id:parseInt(pid.value), quantity:parseInt(document.getElementById(`ol-qty-${i}`).value)||1,
             unit_price:parseFloat(document.getElementById(`ol-price-${i}`).value)||0,
-            vat_percent:parseFloat(document.getElementById(`ol-vat-${i}`).value)||19, discount_percent:0 });
+            vat_percent:parseFloat(document.getElementById(`ol-vat-${i}`).value), discount_percent:parseFloat(document.getElementById(`ol-discount-${i}`).value)||0 });
     }
     const body = { order_type:document.getElementById('f-order_type').value, partner_id:parseInt(document.getElementById('f-partner_id').value),
         partner_type:document.getElementById('f-partner_type').value, date:document.getElementById('f-date').value,
         status:document.getElementById('f-status').value, notes:document.getElementById('f-notes').value||null, items };
     try {
-        if (id) await api('PUT', `/orders/${id}`, body); else await api('POST', '/orders/', body);
+        if (id && window._editingOrderStatus === 'confirmed') await api('PUT', `/orders/${id}`, {status:body.status, notes:body.notes});
+        else if (id) await api('PUT', `/orders/${id}`, body); else await api('POST', '/orders/', body);
         closeModal(); toast(id?'Comanda actualizata!':'Comanda creata!'); navigate('orders');
     } catch(err) { toast(err.message, 'error'); }
 };
 
 window._order_edit = async function(id) {
     const o = await api('GET', `/orders/${id}`);
+    window._editingOrderStatus = o.status;
+    if (['completed','cancelled'].includes(o.status)) { toast('Comanda finalizata nu poate fi modificata. Creati un retur.', 'error'); return; }
     openModal('Editeaza comanda', `
         <div class="form-grid">
             <div class="form-group"><label>Tip</label><select id="f-order_type">
@@ -573,7 +582,7 @@ window._order_edit = async function(id) {
             <div class="form-group"><label>Data</label><input type="date" id="f-date" value="${o.date}"></div>
             <div class="form-group"><label>Status</label><select id="f-status">
                 ${['draft','confirmed','completed','cancelled'].map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-            <div class="form-group"><label>Note</label><input id="f-notes" value="${o.notes||''}"></div>
+            <div class="form-group"><label>Note</label><input id="f-notes" value="${escapeHtml(o.notes||'')}"></div>
         </div>
         <h4 style="margin:16px 0 8px">Linii comanda</h4>
         <div id="order-lines"></div>
@@ -589,7 +598,8 @@ window._order_edit = async function(id) {
             <div class="form-group"><label>Produs ID</label><input type="number" id="ol-product-${idx}" value="${line.product_id}"></div>
             <div class="form-group"><label>Cantitate</label><input type="number" id="ol-qty-${idx}" value="${line.quantity}"></div>
             <div class="form-group"><label>Pret unitar</label><input type="number" step="0.01" id="ol-price-${idx}" value="${line.unit_price}"></div>
-            <div class="form-group"><label>TVA %</label><input type="number" id="ol-vat-${idx}" value="${line.vat_percent}"></div>`;
+            <div class="form-group"><label>TVA %</label><input type="number" id="ol-vat-${idx}" value="${line.vat_percent}"></div>
+            <div class="form-group"><label>Discount %</label><input type="number" id="ol-discount-${idx}" value="${line.discount_percent}" min="0" max="100"></div>`;
         document.getElementById('order-lines').appendChild(div);
     });
 };
@@ -606,17 +616,19 @@ window.load_users = crudPage({
     searchFields: ['name','email'],
     columns: [
         {key:'id',label:'ID'}, {key:'name',label:'Nume'}, {key:'email',label:'Email'},
-        {key:'role_name',label:'Rol',render:i=>`<span class="badge badge-purple">${i.role_name||'Neatribuit'}</span>`},
+        {key:'role_name',label:'Rol',render:i=>`<span class="badge badge-purple">${escapeHtml(i.role_name||'Neatribuit')}</span>`},
         {key:'is_active',label:'Activ',render:i=>`<span class="badge ${i.is_active?'badge-green':'badge-red'}">${i.is_active?'Da':'Nu'}</span>`},
     ],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>Nume</label><input id="f-name" value="${i.name||''}"></div>
-        <div class="form-group"><label>Email</label><input id="f-email" value="${i.email||''}"></div>
-        <div class="form-group"><label>Rol ID</label><input type="number" id="f-role_id" value="${i.role_id||''}"></div>
+        <div class="form-group"><label>Nume</label><input id="f-name" value="${escapeHtml(i.name||'')}"></div>
+        <div class="form-group"><label>Email</label><input id="f-email" value="${escapeHtml(i.email||'')}"></div>
+        ${i.id ? '' : '<div class="form-group"><label>Parola initiala</label><input type="password" id="f-password" minlength="12" required></div>'}
+        <div class="form-group"><label>Rol ID</label><input type="number" id="f-role_id" value="${escapeHtml(i.role_id||'')}"></div>
         <div class="form-group"><label>Activ</label><select id="f-is_active"><option value="true" ${i.is_active!==false?'selected':''}>Da</option><option value="false" ${i.is_active===false?'selected':''}>Nu</option></select></div>
     </div>`,
     getFormData: () => ({
         name:document.getElementById('f-name').value, email:document.getElementById('f-email').value,
+        ...(document.getElementById('f-password') ? {password:document.getElementById('f-password').value} : {}),
         role_id:parseInt(document.getElementById('f-role_id').value)||null,
         is_active:document.getElementById('f-is_active').value==='true',
     }),
@@ -628,8 +640,8 @@ window.load_roles = crudPage({
     searchFields: ['name'],
     columns: [{key:'id',label:'ID'}, {key:'name',label:'Nume'}, {key:'description',label:'Descriere'}],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>Nume *</label><input id="f-name" value="${i.name||''}"></div>
-        <div class="form-group full"><label>Descriere</label><textarea id="f-description" rows="2">${i.description||''}</textarea></div>
+        <div class="form-group"><label>Nume *</label><input id="f-name" value="${escapeHtml(i.name||'')}"></div>
+        <div class="form-group full"><label>Descriere</label><textarea id="f-description" rows="2">${escapeHtml(i.description||'')}</textarea></div>
     </div>`,
     getFormData: () => ({ name:document.getElementById('f-name').value, description:document.getElementById('f-description').value||null }),
 });
@@ -640,12 +652,12 @@ window.load_addresses = crudPage({
     searchFields: ['city','county','street'],
     columns: [{key:'id',label:'ID'},{key:'city',label:'Oras'},{key:'county',label:'Judet'},{key:'street',label:'Strada'},{key:'country',label:'Tara'}],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>Tara</label><input id="f-country" value="${i.country||'Romania'}"></div>
-        <div class="form-group"><label>Judet</label><input id="f-county" value="${i.county||''}"></div>
-        <div class="form-group"><label>Oras</label><input id="f-city" value="${i.city||''}"></div>
-        <div class="form-group"><label>Cod postal</label><input id="f-postal" value="${i.postal_code||''}"></div>
-        <div class="form-group full"><label>Strada</label><input id="f-street" value="${i.street||''}"></div>
-        <div class="form-group full"><label>Info suplimentare</label><input id="f-additional" value="${i.additional_info||''}"></div>
+        <div class="form-group"><label>Tara</label><input id="f-country" value="${escapeHtml(i.country||'Romania')}"></div>
+        <div class="form-group"><label>Judet</label><input id="f-county" value="${escapeHtml(i.county||'')}"></div>
+        <div class="form-group"><label>Oras</label><input id="f-city" value="${escapeHtml(i.city||'')}"></div>
+        <div class="form-group"><label>Cod postal</label><input id="f-postal" value="${escapeHtml(i.postal_code||'')}"></div>
+        <div class="form-group full"><label>Strada</label><input id="f-street" value="${escapeHtml(i.street||'')}"></div>
+        <div class="form-group full"><label>Info suplimentare</label><input id="f-additional" value="${escapeHtml(i.additional_info||'')}"></div>
     </div>`,
     getFormData: () => ({
         country:document.getElementById('f-country').value, county:document.getElementById('f-county').value||null,
@@ -660,15 +672,15 @@ window.load_documents = crudPage({
     searchFields: ['name','type'],
     columns: [
         {key:'id',label:'ID'}, {key:'name',label:'Nume'},
-        {key:'type',label:'Tip',render:i=>`<span class="badge badge-blue">${i.type}</span>`},
+        {key:'type',label:'Tip',render:i=>`<span class="badge badge-blue">${escapeHtml(i.type)}</span>`},
         {key:'record_type',label:'Entitate'}, {key:'record_id',label:'ID Entitate'},
     ],
     formHtml: i => `<div class="form-grid">
-        <div class="form-group"><label>Nume *</label><input id="f-name" value="${i.name||''}"></div>
-        <div class="form-group"><label>Tip *</label><input id="f-type" value="${i.type||''}" placeholder="invoice, contract, AWB..."></div>
-        <div class="form-group full"><label>URL</label><input id="f-url" value="${i.url||''}"></div>
-        <div class="form-group"><label>Tip entitate *</label><input id="f-record_type" value="${i.record_type||''}" placeholder="company, order..."></div>
-        <div class="form-group"><label>ID Entitate *</label><input type="number" id="f-record_id" value="${i.record_id||''}"></div>
+        <div class="form-group"><label>Nume *</label><input id="f-name" value="${escapeHtml(i.name||'')}"></div>
+        <div class="form-group"><label>Tip *</label><input id="f-type" value="${escapeHtml(i.type||'')}" placeholder="invoice, contract, AWB..."></div>
+        <div class="form-group full"><label>URL</label><input id="f-url" value="${escapeHtml(i.url||'')}"></div>
+        <div class="form-group"><label>Tip entitate *</label><input id="f-record_type" value="${escapeHtml(i.record_type||'')}" placeholder="company, order..."></div>
+        <div class="form-group"><label>ID Entitate *</label><input type="number" id="f-record_id" value="${escapeHtml(i.record_id||'')}"></div>
     </div>`,
     getFormData: () => ({
         name:document.getElementById('f-name').value, type:document.getElementById('f-type').value,
@@ -678,4 +690,6 @@ window.load_documents = crudPage({
 });
 
 // --- Init ---
-if (token && currentUser) showApp(); else showLogin();
+if (token && currentUser) {
+    api('GET', '/auth/me').then(me => { currentUser=me; showApp(); }).catch(() => logout());
+} else showLogin();

@@ -5,12 +5,12 @@ from typing import Optional
 class InventoryCreate(BaseModel):
     product_id: int
     quantity: int = Field(..., ge=0)
-    reserved: int = 0
+    reserved: int = Field(0, ge=0)
 
 
 class InventoryUpdate(BaseModel):
-    quantity: Optional[int] = None
-    reserved: Optional[int] = None
+    quantity: Optional[int] = Field(None, ge=0)
+    reserved: Optional[int] = Field(None, ge=0)
 
 
 class InventoryOut(BaseModel):
